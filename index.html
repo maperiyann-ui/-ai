@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>みなちゃんチャット</title>
+<style>
+:root{--bg:#0f1115;--panel:#171a21;--panel2:#1e222b;--line:#2a2f3a;--text:#e6e8ee;--sub:#8b93a5;--acc:#6c8cff;--err:#ff6b6b;--ok:#4cd68a}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font:15px/1.65 system-ui,"Yu Gothic UI","Meiryo",sans-serif}
+button,input,textarea,select{font:inherit;color:inherit}
+#app{display:flex;height:100%}
+#side{width:260px;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;flex-shrink:0}
+#side .top{padding:12px;display:flex;gap:8px}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer}
+.btn:hover{border-color:var(--acc)}
+.btn.primary{background:var(--acc);border-color:var(--acc);color:#fff}
+#newchat{flex:1}
+#list{flex:1;overflow:auto;padding:0 8px 8px}
+.item{display:flex;align-items:center;gap:4px;padding:8px 10px;border-radius:8px;cursor:pointer;color:var(--sub)}
+.item:hover{background:var(--panel2)}
+.item.on{background:var(--panel2);color:var(--text)}
+.item span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item .del{opacity:0;border:0;background:none;cursor:pointer;color:var(--sub)}
+.item:hover .del{opacity:1}
+#main{flex:1;display:flex;flex-direction:column;min-width:0}
+#bar{padding:10px 16px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+#chips{display:flex;gap:6px;flex-wrap:wrap;flex:1}
+.chip{padding:4px 12px;border-radius:999px;border:1px solid var(--line);background:var(--panel);cursor:pointer;font-size:13px;color:var(--sub)}
+.chip.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.chip.off{opacity:.5;text-decoration:line-through}
+label.tg{display:flex;gap:6px;align-items:center;color:var(--sub);font-size:13px;cursor:pointer}
+#msgs{flex:1;overflow:auto;padding:20px 16px}
+.wrap{max-width:1100px;margin:0 auto}
+.m{margin-bottom:22px}
+.user{display:flex;justify-content:flex-end}
+.user .b{background:var(--acc);color:#fff;padding:10px 14px;border-radius:14px 14px 4px 14px;max-width:80%;white-space:pre-wrap;word-break:break-word}
+.replies{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+.replies.one{grid-template-columns:1fr}
+.rp{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;min-width:0}
+.rp h4{margin:0 0 6px;font-size:12px;color:var(--sub);font-weight:600;display:flex;justify-content:space-between}
+.rp .body{word-break:break-word;overflow-wrap:anywhere}
+.rp .body p{margin:.4em 0}
+.err{color:var(--err);white-space:pre-wrap}
+pre{background:#0a0c10;border:1px solid var(--line);border-radius:8px;padding:10px;overflow:auto;font-size:13px}
+code{font-family:ui-monospace,Consolas,monospace}
+:not(pre)>code{background:#0a0c10;padding:1px 5px;border-radius:4px;font-size:.9em}
+details.think{color:var(--sub);font-size:13px;margin:6px 0}
+.cursor::after{content:"▍";animation:bl 1s steps(1) infinite;color:var(--acc)}
+@keyframes bl{50%{opacity:0}}
+#empty{text-align:center;color:var(--sub);margin-top:15vh}
+#inp{border-top:1px solid var(--line);padding:12px 16px}
+#inp .row{max-width:1100px;margin:0 auto;display:flex;gap:8px;align-items:flex-end}
+textarea#t{flex:1;resize:none;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px;max-height:200px;outline:none}
+textarea#t:focus{border-color:var(--acc)}
+dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:14px;width:min(520px,92vw);padding:20px}
+dialog::backdrop{background:#0009}
+dialog label{display:block;margin:12px 0 4px;color:var(--sub);font-size:13px}
+dialog input,dialog textarea{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+dialog .help{font-size:12px;color:var(--sub);background:var(--bg);border-radius:8px;padding:8px 10px;margin-top:10px}
+dialog code{user-select:all}
+@media(max-width:760px){#side{display:none}}
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="side">
+    <div class="top"><button class="btn primary" id="newchat">＋ 新しいチャット</button></div>
+    <div id="list"></div>
+    <div class="top"><button class="btn" id="setbtn" style="flex:1">⚙ 設定</button></div>
+  </aside>
+  <section id="main">
+    <div id="bar">
+      <div id="chips"></div>
+      <label class="tg"><input type="checkbox" id="cmp"> 比較モード(複数同時)</label>
+      <span id="stat" style="font-size:12px;color:var(--sub)"></span>
+    </div>
+    <div id="msgs"><div class="wrap" id="wrap"></div></div>
+    <div id="inp"><div class="row">
+      <textarea id="t" rows="1" placeholder="メッセージを入力(Enterで送信 / Shift+Enterで改行)"></textarea>
+      <button class="btn primary" id="send">送信</button>
+      <button class="btn" id="stop" style="display:none">停止</button>
+    </div></div>
+  </section>
+</div>
+
+<dialog id="dlg">
+  <h3 style="margin:0 0 4px">設定</h3>
+  <label>Gemini APIキー(<a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--acc)">Google AI Studioで無料取得</a>)</label>
+  <input id="s_key" type="password" placeholder="AIza...">
+  <label>Geminiモデル名</label>
+  <input id="s_gm" placeholder="gemini-2.5-flash">
+  <label>Ollama URL</label>
+  <input id="s_ol" placeholder="http://localhost:11434">
+  <label>システムプロンプト(任意・全モデル共通)</label>
+  <textarea id="s_sys" rows="3" placeholder="例: あなたは親切な日本語アシスタントです。"></textarea>
+  <div class="help">
+    ブラウザからOllamaに接続するには、Ollamaを一度終了し、コマンドプロンプトで次を実行します:<br>
+    <code>set OLLAMA_ORIGINS=*</code> → <code>ollama serve</code><br>
+    (恒久設定: <code>setx OLLAMA_ORIGINS "*"</code> 後にOllamaを再起動)<br>
+    APIキーや履歴はこのブラウザ内(localStorage)にのみ保存されます。
+  </div>
+  <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
+    <button class="btn" id="s_cancel">閉じる</button>
+    <button class="btn primary" id="s_save">保存</button>
+  </div>
+</dialog>
+
+<script>
+const $=s=>document.querySelector(s);
+const LS=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch{return d}};
+const save=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}};
+
+let settings=Object.assign({geminiKey:'',geminiModel:'gemini-2.5-flash',ollamaUrl:'http://localhost:11434',system:''},LS('settings',{}));
+let chats=LS('chats',[]);
+let curId=LS('cur',null);
+let models=[]; // {id,label,type,name}
+let sel=LS('sel',[]);
+let compare=LS('cmp',false);
+let abort=null;
+
+const cur=()=>chats.find(c=>c.id===curId);
+function newChat(){const c={id:Date.now().toString(36),title:'新しいチャット',msgs:[]};chats.unshift(c);curId=c.id;persist();renderAll()}
+function persist(){save('chats',chats);save('cur',curId);save('sel',sel);save('cmp',compare);save('settings',settings)}
+
+async function loadModels(){
+  const list=[];
+  try{
+    const r=await fetch(settings.ollamaUrl.replace(/\/$/,'')+'/api/tags');
+    const j=await r.json();
+    (j.models||[]).forEach(m=>list.push({id:'ollama:'+m.name,label:shortName(m.name),type:'ollama',name:m.name}));
+    $('#stat').textContent='Ollama接続OK';$('#stat').style.color='var(--ok)';
+  }catch(e){
+    $('#stat').textContent='Ollama未接続(設定を確認)';$('#stat').style.color='var(--err)';
+  }
+  list.push({id:'gemini',label:'Gemini ('+settings.geminiModel+')',type:'gemini',name:settings.geminiModel});
+  models=list;
+  sel=sel.filter(id=>models.some(m=>m.id===id));
+  if(!sel.length)sel=[models[0].id];
+  renderChips();
+}
+function shortName(n){
+  n=n.replace(/^hf\.co\/[^/]+\//,'').replace(/^[^/]+\//,'');
+  return n.length>34?n.slice(0,32)+'…':n;
+}
+
+function renderChips(){
+  $('#cmp').checked=compare;
+  $('#chips').innerHTML='';
+  models.forEach(m=>{
+    const b=document.createElement('button');
+    b.className='chip'+(sel.includes(m.id)?' on':'');
+    b.textContent=m.label;b.title=m.name;
+    b.onclick=()=>{
+      if(compare){sel=sel.includes(m.id)?sel.filter(x=>x!==m.id):[...sel,m.id];if(!sel.length)sel=[m.id]}
+      else sel=[m.id];
+      persist();renderChips();
+    };
+    $('#chips').appendChild(b);
+  });
+}
+
+function renderList(){
+  const el=$('#list');el.innerHTML='';
+  chats.forEach(c=>{
+    const d=document.createElement('div');d.className='item'+(c.id===curId?' on':'');
+    d.innerHTML='<span></span><button class="del" title="削除">✕</button>';
+    d.querySelector('span').textContent=c.title;
+    d.onclick=()=>{if(abort)return;curId=c.id;persist();renderAll()};
+    d.querySelector('.del').onclick=e=>{e.stopPropagation();if(abort)return;chats=chats.filter(x=>x.id!==c.id);if(curId===c.id)curId=chats[0]?.id||null;if(!curId)return newChat();persist();renderAll()};
+    el.appendChild(d);
+  });
+}
+
+const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function md(src){
+  // think block (qwen3 等)
+  let thinkHtml='';
+  src=src.replace(/<think>([\s\S]*?)(<\/think>|$)/,(m,t)=>{thinkHtml='<details class="think"><summary>思考過程</summary><div style="white-space:pre-wrap">'+esc(t.trim())+'</div></details>';return''});
+  const parts=src.split(/```/);
+  let out='';
+  parts.forEach((p,i)=>{
+    if(i%2===1){
+      const nl=p.indexOf('\n');const code=nl>=0?p.slice(nl+1):p;
+      out+='<pre><code>'+esc(code.replace(/\n$/,''))+'</code></pre>';
+    }else{
+      let h=esc(p);
+      h=h.replace(/`([^`\n]+)`/g,'<code>$1</code>').replace(/\*\*([^*\n]+)\*\*/g,'<b>$1</b>');
+      h=h.split(/\n{2,}/).map(x=>x.trim()?'<p>'+x.trim().replace(/\n/g,'<br>')+'</p>':'').join('');
+      out+=h;
+    }
+  });
+  return thinkHtml+out;
+}
+
+let pending=false;
+function renderMsgs(){
+  const c=cur();const w=$('#wrap');
+  const box=$('#msgs');const near=box.scrollHeight-box.scrollTop-box.clientHeight<120;
+  if(!c||!c.msgs.length){w.innerHTML='<div id="empty"><h2>マルチAIチャット</h2><p>ローカルのOllamaモデルとGemini無料枠で会話できます。<br>「比較モード」で複数モデルに同時に質問できます。</p></div>';return}
+  w.innerHTML='';
+  c.msgs.forEach(m=>{
+    const d=document.createElement('div');d.className='m';
+    if(m.role==='user'){d.className+=' user';const b=document.createElement('div');b.className='b';b.textContent=m.content;d.appendChild(b)}
+    else{
+      const g=document.createElement('div');g.className='replies'+(m.replies.length===1?' one':'');
+      m.replies.forEach(r=>{
+        const p=document.createElement('div');p.className='rp';
+        const lab=(models.find(x=>x.id===r.model)||{label:r.model}).label;
+        p.innerHTML='<h4><span></span></h4><div class="body"></div>';
+        p.querySelector('span').textContent=lab;
+        const body=p.querySelector('.body');
+        if(r.content)body.innerHTML=md(r.content);
+        if(r.error){const e=document.createElement('div');e.className='err';e.textContent=r.error;body.appendChild(e)}
+        if(r.loading)body.classList.add('cursor');
+        g.appendChild(p);
+      });
+      d.appendChild(g);
+    }
+    w.appendChild(d);
+  });
+  if(near)box.scrollTop=box.scrollHeight;
+}
+function schedule(){if(pending)return;pending=true;requestAnimationFrame(()=>{pending=false;renderMsgs()})}
+function renderAll(){renderList();renderMsgs();$('#msgs').scrollTop=$('#msgs').scrollHeight}
+
+// ---- 履歴構築 ----
+function historyFor(c,modelId,upTo){
+  const h=[];
+  for(let i=0;i<upTo;i++){
+    const m=c.msgs[i];
+    if(m.role==='user')h.push({role:'user',content:m.content});
+    else{
+      const r=m.replies.find(x=>x.model===modelId&&x.content)||m.replies.find(x=>x.content);
+      if(r)h.push({role:'assistant',content:r.content.replace(/<think>[\s\S]*?<\/think>/,'').trim()});
+    }
+  }
+  return h;
+}
+
+// ---- API ----
+async function streamOllama(m,hist,signal,onDelta){
+  const msgs=[...(settings.system?[{role:'system',content:settings.system}]:[]),...hist];
+  const res=await fetch(settings.ollamaUrl.replace(/\/$/,'')+'/api/chat',{method:'POST',signal,headers:{'Content-Type':'application/json'},body:JSON.stringify({model:m.name,messages:msgs,stream:true})});
+  if(!res.ok)throw new Error('Ollama '+res.status+': '+await res.text());
+  await readLines(res,line=>{const j=JSON.parse(line);if(j.error)throw new Error(j.error);if(j.message?.content)onDelta(j.message.content)});
+}
+async function streamGemini(m,hist,signal,onDelta){
+  if(!settings.geminiKey)throw new Error('Gemini APIキーが未設定です。⚙設定から入力してください。');
+  const body={contents:hist.map(h=>({role:h.role==='user'?'user':'model',parts:[{text:h.content}]}))};
+  if(settings.system)body.systemInstruction={parts:[{text:settings.system}]};
+  const url='https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(m.name)+':streamGenerateContent?alt=sse';
+  const res=await fetch(url,{method:'POST',signal,headers:{'Content-Type':'application/json','x-goog-api-key':settings.geminiKey},body:JSON.stringify(body)});
+  if(!res.ok){let t=await res.text();try{t=JSON.parse(t).error.message}catch{}throw new Error('Gemini '+res.status+': '+t)}
+  await readLines(res,line=>{
+    if(!line.startsWith('data:'))return;
+    const j=JSON.parse(line.slice(5));
+    (j.candidates?.[0]?.content?.parts||[]).forEach(p=>{if(p.text)onDelta(p.text)});
+  });
+}
+async function readLines(res,fn){
+  const rd=res.body.getReader();const dec=new TextDecoder();let buf='';
+  for(;;){
+    const {done,value}=await rd.read();if(done)break;
+    buf+=dec.decode(value,{stream:true});
+    let i;while((i=buf.indexOf('\n'))>=0){const l=buf.slice(0,i).trim();buf=buf.slice(i+1);if(l)fn(l)}
+  }
+  if(buf.trim())fn(buf.trim());
+}
+
+async function send(){
+  const t=$('#t');const text=t.value.trim();
+  if(!text||abort)return;
+  let c=cur();if(!c){newChat();c=cur()}
+  t.value='';autosize();
+  c.msgs.push({role:'user',content:text});
+  if(c.msgs.length===1)c.title=text.slice(0,24);
+  const targets=sel.map(id=>models.find(m=>m.id===id)).filter(Boolean);
+  const am={role:'assistant',replies:targets.map(m=>({model:m.id,content:'',loading:true}))};
+  c.msgs.push(am);
+  const upTo=c.msgs.length-2+1;
+  abort=new AbortController();
+  $('#send').style.display='none';$('#stop').style.display='';
+  renderAll();
+  await Promise.all(targets.map(async(m,i)=>{
+    const r=am.replies[i];
+    const hist=historyFor(c,m.id,upTo);
+    try{
+      const fn=m.type==='gemini'?streamGemini:streamOllama;
+      await fn(m,hist,abort.signal,d=>{r.content+=d;schedule()});
+    }catch(e){
+      if(e.name!=='AbortError'){
+        r.error=e.message+(m.type==='ollama'&&/fetch/i.test(e.message)?'\n→ Ollamaが起動していないか、OLLAMA_ORIGINS=* が未設定です(⚙設定を参照)。':'');
+      }
+    }
+    r.loading=false;schedule();
+  }));
+  am.replies.forEach(r=>{r.loading=false});
+  abort=null;
+  $('#send').style.display='';$('#stop').style.display='none';
+  persist();renderAll();t.focus();
+}
+
+function autosize(){const t=$('#t');t.style.height='auto';t.style.height=Math.min(t.scrollHeight,200)+'px'}
+
+// ---- events ----
+$('#send').onclick=send;
+$('#stop').onclick=()=>abort&&abort.abort();
+$('#newchat').onclick=()=>{if(!abort)newChat()};
+$('#t').addEventListener('input',autosize);
+$('#t').addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing&&e.keyCode!==229){e.preventDefault();send()}
+});
+$('#cmp').onchange=e=>{compare=e.target.checked;if(!compare)sel=[sel[0]];persist();renderChips()};
+$('#setbtn').onclick=()=>{
+  $('#s_key').value=settings.geminiKey;$('#s_gm').value=settings.geminiModel;
+  $('#s_ol').value=settings.ollamaUrl;$('#s_sys').value=settings.system;
+  $('#dlg').showModal();
+};
+$('#s_cancel').onclick=()=>$('#dlg').close();
+$('#s_save').onclick=async()=>{
+  settings.geminiKey=$('#s_key').value.trim();
+  settings.geminiModel=$('#s_gm').value.trim()||'gemini-2.5-flash';
+  settings.ollamaUrl=$('#s_ol').value.trim()||'http://localhost:11434';
+  settings.system=$('#s_sys').value;
+  persist();$('#dlg').close();await loadModels();renderMsgs();
+};
+
+(async()=>{
+  if(!chats.length)newChat();else if(!cur())curId=chats[0].id;
+  await loadModels();
+  renderAll();
+})();
+</script>
+</body>
+</html>
